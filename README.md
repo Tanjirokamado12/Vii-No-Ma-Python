@@ -22,3 +22,5 @@ Note:No patcher in Python has been Made,So you need to rely (for now) to Nodejs 
 
 ---
 Note:If you have Any Issues,You're Free to Make a Issue on Issues,But if error code is 358404,is just the functionnality is not Avariable for Now (so don't make a issue) or by Discord at @shorekeeper_oem
+-Most lots of Support has been made for v770 and v1025
+-v0/v512 devloppement is not started yet.
