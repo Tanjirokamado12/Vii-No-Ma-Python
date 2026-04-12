@@ -14,6 +14,8 @@ Mobilclip Converter:https://github.com/RiiConnect24/mobiclip-conversion-tool/rel
 
 -Run pip install -r requirements.txt
 
+-Before start,you need to create Images (for do this use paint.net and follow instructions of /assets/Images Resolutions.txt) otherise,Error code 358404 will occure
+
 -after run 'Python App.py'
 
 Note:No patcher in Python has been Made,So you need to rely (for now) to Nodejs Patcher at https://github.com/Tanjirokamado12/Vii-no-ma/tree/main/patcher
