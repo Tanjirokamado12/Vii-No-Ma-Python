@@ -1,0 +1,12 @@
+Posterid1:1
+Posterid2:2
+IntroInfo
+IntroMovid:0000000000000000
+cntid:1
+Linktype:0
+Linkid:1
+IntroInfo
+IntroMovid:0000000000000000
+cntid:1
+Linktype:0
+Linkid:1

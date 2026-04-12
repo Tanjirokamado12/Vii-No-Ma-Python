@@ -1,0 +1,19 @@
+Movie=160x120
+Calendar (if timg=1)=240x160 (if timg=2)=832x456
+CategoryImages=160x120
+Coupon=832x456
+Delivery=832x456
+Intro=832x456
+Pictures=832x456
+Specials=(for gXXXX=184x80 for fXXXX=320x180,For aXXXX bXXXX cXXXX dXXXX hXXXX iXXXX=160x120,for Enquete (2 Answers)=256x128)
+UrlLink=832x456
+Wall=256x360,Regionnal Poster=360x256
+Theatre\intro=832x456
+Theatre\Movie=320x456
+Theatre\Wall=256x360
+
+Note:For Images,Paint.net is required,on Paint.net Exporting set to JPG,and on Quality at 20,Otherise:354405
+
+354402=Incorrect image height
+354403=Incorrect image width
+354405=Image Are invalid

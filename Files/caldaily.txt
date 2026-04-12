@@ -1,0 +1,34 @@
+Date:2026-04-12
+Tindex:1
+Thead:Test
+Tdetails:This is a test for theads
+timg:0
+timgnum:0
+tbgm:1
+movieid:1
+movieid:2
+movieid:3
+movieid:4
+
+Default String:
+Tindex:1
+Thead:Welcome to Vii no ma
+Tdetails:This is default Values For Caldaily,them can be modified in /files/caldaily.txt
+timg:0
+timgnum:0
+tbgm:3
+Tindex:2
+Thead:Help And Support
+Tdetails:For any help and support,contact me on discord @shorekeeper_oem or report a issue on github
+timg:0
+timgnum:0
+Tindex:3
+Thead:Help And Support
+Tdetails:For any help and support,contact me on discord @shorekeeper_oem or report a issue on github
+timg:0
+timgnum:0
+tbgm:3
+movieid:1
+movieid:2
+movieid:3
+movieid:4

@@ -1,0 +1,5 @@
+Categid:10000
+Name:Category1
+
+Categid:10002
+Name:Category2

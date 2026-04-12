@@ -1,0 +1,9 @@
+LinkInfo
+movieid:1
+paymovid:1
+LinkInfo
+movieid:2
+categid:30000
+Linkinfo
+movieid:3
+shopid:1

@@ -1,0 +1,14 @@
+PosterId:1
+MovieId:1
+
+PosterId:2
+MovieId:2
+
+PosterId:3
+MovieId:3
+
+PosterId:4
+MovieId:4
+
+PosterId:5
+MovieId:5

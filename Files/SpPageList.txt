@@ -1,0 +1,19 @@
+Pageinfo
+sppageid:1
+Name:SpPageName
+Level:1
+Miiid:1
+Color1:388373
+Color2:237237
+Logo1id:g1373
+News:This is news
+Pageinfo
+sppageid:1
+Name:SpPageName
+Level:1
+Miiid:1
+Color1:388373
+Color2:237237
+Logo1id:g1373
+News:This is news
+
