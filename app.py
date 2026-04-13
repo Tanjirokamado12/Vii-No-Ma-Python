@@ -126,6 +126,7 @@ def pay_wall_files(filename):
 # Dynamic encrypted endpoint
 # -----------------------
 
+@app.route('/conf/first.bin')
 @app.route('/v770/first.bin')
 def generate_first_bin():
     # Check config exists
