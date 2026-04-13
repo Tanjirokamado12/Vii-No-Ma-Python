@@ -1438,7 +1438,7 @@ def new_pay_movies():
         xml.append(f"<title>{title}</title>")
         xml.append("<kana>12345678</kana>")
         xml.append("<refid>01234567890123456789012345678912</refid>")
-        xml.append("<strdt>2000-01-01T00:00:00</strdt>")
+        xml.append("<strdt>2000-01-01T00:00:01</strdt>")
         xml.append("<pop>1</pop>")
         xml.append(f"<released>{released}</released>")
         xml.append("<term>1</term>")
