@@ -7,7 +7,7 @@ Intro=832x456
 Pictures=832x456
 Specials=(for gXXXX=184x80 for fXXXX=320x180,For aXXXX bXXXX cXXXX dXXXX hXXXX iXXXX=160x120,for Enquete (2 Answers)=256x128)
 UrlLink=832x456
-Wall=256x360,Regionnal Poster=360x256
+Wall=256x360,Regionnal Poster (set on adid on Event.txt)=360x256,FrameId (set on Event.txt)=256x96
 Theatre\intro=832x456
 Theatre\Movie=320x456
 Theatre\Wall=256x360
