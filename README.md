@@ -14,11 +14,33 @@ Mobilclip Converter:https://github.com/RiiConnect24/mobiclip-conversion-tool/rel
 
 -Run pip install -r requirements.txt
 
--Before start,you need to create Images (for do this use paint.net and follow instructions of /assets/Images Resolutions.txt) otherise,Error code 358404 will occure
+-Before start,you need to create Images (for do this use paint.net and follow instructions of /assets/Images Resolutions.txt otherise,Error code 358404 will occure) at:
+
+/assets/wall/3.jpg (Normal Poster)
+
+/assets/wall/4.jpg (frame Poster)
+
+/assets/wall/1.jpg (Regionnal Poster)
+
+/assets/intro/1-1.jpg 
+
+/assets/Theatre/wall/1.jpg 
+
+/assets/Theatre/wall/2.jpg 
+
+/Assets/Theatre/Movie/1.jpg
+
+/Assets/Theatre/Movie/2.jpg
+
+/Assets/CategoryImages/10000.jpg
+
+/Assets/CategoryImages/10002.jpg
+
+(this will allow the channel to startup Correctly,if you made changes on files or add More Elements,Create New ones or Rename it)
 
 -after run 'Python App.py'
 
-Note:No patcher in Python has been Made,So you need to rely (for now) to Nodejs Patcher at https://github.com/Tanjirokamado12/Vii-no-ma/tree/main/patcher
+Patch the App Using Patcher/Patcher.py
 
 ---
 Note:If you have Any Issues,You're Free to Make a Issue on Issues,But if error code is 358404,is just the functionnality is not Avariable for Now (so don't make a issue) or by Discord at @shorekeeper_oem
