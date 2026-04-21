@@ -1,0 +1,13 @@
+Categid:10000
+Movieid:1
+Movieid:2
+Movieid:3
+Movieid:4
+Movieid:5
+
+Categid:10002
+Movieid:1
+Movieid:2
+Movieid:3
+Movieid:4
+Movieid:5

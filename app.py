@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 from datetime import datetime
 from datetime import date
 import xml.etree.ElementTree as ET
+from flask import Flask, Response
+import xml.etree.ElementTree as ET
+import os
+import re
 
 app = Flask(__name__)
 
@@ -81,10 +85,10 @@ def delivery_files(filename):
 def intro_files(filename):
     return serve_file(DIRS["intro"], filename)
 
-@app.route("/v1025/url1/movie/<movieid>/<path:filename>")
-@app.route("/v770/url1/movie/<movieid>/<path:filename>")
-def movie_files(movieid, filename):
-    return serve_file(DIRS["movies_posters"], filename)
+@app.route("/v1025/url1/movie/<unk>/<movieid>.jpg")
+@app.route("/v770/url1/movie/<unk>/<movieid>.jpg")
+def movie_image(unk, movieid):
+    return send_from_directory("assets/Movie", f"{movieid}.jpg")
 
 
 @app.route("/v1025/url3/pay/movie/<unk>/<movieid>/<path:filename>")
@@ -93,6 +97,7 @@ def theatre_movie_files(unk, movieid, filename):
     return serve_file(DIRS["theatre_posters"], filename)
 
 @app.route('/v1025/url3/pay/intro/<path:filename>')
+@app.route('/v770/url3/pay/intro/<path:filename>')
 def pay_intro_files(filename):
     return serve_file(DIRS["pay_intro"], filename)
 
@@ -1451,7 +1456,221 @@ def new_pay_movies():
 
     return Response("\n".join(xml), mimetype="application/xml")
 
+CATEGORY_FILE = "files/CategoryMovies.txt"
+MOVIE_META_FILE = "files/MovieMeta.txt"
 
+
+# ----------------------------
+# CATEGORY PARSER
+# ----------------------------
+def parse_category_file(categid):
+    movie_ids = []
+    found = False
+
+    with open(CATEGORY_FILE, "r", encoding="utf-8") as f:
+        lines = [l.strip() for l in f.readlines()]
+
+    for line in lines:
+        if line.startswith("Categid:"):
+            current = line.split(":", 1)[1].strip()
+            found = (current == str(categid))
+
+        elif found and line.startswith("Movieid:"):
+            mid = line.split(":", 1)[1].strip()
+            if mid:
+                movie_ids.append(mid)
+
+        elif line.startswith("Categid:") and found:
+            break
+
+    return movie_ids
+
+
+# ----------------------------
+# MOVIE META PARSER
+# ----------------------------
+def load_movie_meta():
+    meta = {}
+
+    with open(MOVIE_META_FILE, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+
+    blocks = content.split("\n\n")
+
+    for block in blocks:
+        lines = block.splitlines()
+
+        movie_id = None
+        title = ""
+        genre = ""
+
+        for line in lines:
+            if ":" not in line:
+                continue
+
+            key, value = line.split(":", 1)
+            key = key.strip().lower()
+            value = value.strip()
+
+            if key == "movieid":
+                movie_id = value
+            elif key == "title":
+                title = value
+            elif key == "genre":
+                genre = value
+
+        if movie_id:
+            meta[movie_id] = {
+                "title": title,
+                "genre": genre
+            }
+
+    return meta
+
+
+# ----------------------------
+# ROUTE
+# ----------------------------
+@app.route("/v770/url1/list/category/search/<categid>")
+@app.route("/v1025/url1/list/category/search/<categid>")
+def search_category(categid):
+
+    movie_ids = parse_category_file(categid)
+
+    if not movie_ids:
+        return Response(
+            "<CategoryMovies><error>not found</error></CategoryMovies>",
+            mimetype="application/xml"
+        )
+
+    meta = load_movie_meta()
+
+    root = ET.Element("CategoryMovies")
+
+    ET.SubElement(root, "ver").text = "1"
+    ET.SubElement(root, "categid").text = str(categid)
+
+    for idx, mid in enumerate(movie_ids, start=1):
+        info = ET.SubElement(root, "movieinfo")
+
+        ET.SubElement(info, "rank").text = str(idx)
+        ET.SubElement(info, "movieid").text = mid
+
+        movie = meta.get(mid, {})
+
+        ET.SubElement(info, "title").text = movie.get("title", "")
+        ET.SubElement(info, "genre").text = movie.get("genre", "")
+        ET.SubElement(info, "strdt").text = "2000-01-01T00:00:00"
+        ET.SubElement(info, "pop").text = "0"
+
+    xml_data = ET.tostring(root, encoding="utf-8")
+
+    return Response(xml_data, mimetype="application/xml")
+    
+
+# -----------------------------
+# Load and parse movie file
+# -----------------------------
+def load_moviesMetaData(path="files/moviemeta.txt"):
+    movies = {}
+    current = {}
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+
+            # blank line = end of block
+            if not line:
+                if "MovieId" in current:
+                    movies[current["MovieId"]] = current
+                current = {}
+                continue
+
+            if ":" in line:
+                key, value = line.split(":", 1)
+                current[key.strip()] = value.strip()
+
+        # last block
+        if "MovieId" in current:
+            movies[current["MovieId"]] = current
+
+    return movies
+
+
+movies_db = load_moviesMetaData()
+
+
+# -----------------------------
+# Route
+# -----------------------------
+@app.route("/v770/url1/movie/<unk>/<movieid>.met")
+@app.route("/v1025/url1/movie/<unk>/<movieid>.met")
+def MovieMetaData(unk, movieid):
+    movie = movies_db.get(movieid)
+
+    if not movie:
+        return Response(
+            "<error>Movie not found</error>",
+            mimetype="application/xml",
+            status=404
+        )
+
+    # -----------------------------
+    # Build XML
+    # -----------------------------
+    root = ET.Element("MovieMeta")
+
+    ET.SubElement(root, "ver").text = "1"
+    ET.SubElement(root, "movieid").text = movieid
+    ET.SubElement(root, "title").text = movie.get("Title", "")
+    ET.SubElement(root, "len").text = movie.get("len", "")
+    ET.SubElement(root, "aspect").text = movie.get("Aspect", "")
+    ET.SubElement(root, "genre").text = movie.get("genre", "")
+    ET.SubElement(root, "strdt").text = "2000-01-01T00:00:00"
+    ET.SubElement(root, "enddt").text = "2030-01-01T00:00:00"
+    ET.SubElement(root, "sppageid").text = movie.get("SpPageid", "")
+
+    dsdist = movie.get("dsdist", "")
+
+    ET.SubElement(root, "dsdist").text = dsdist
+
+    # ✅ condition: only include dsmovid if dsdist != "0"
+    if dsdist != "0":
+        ET.SubElement(root, "dsmovid").text = movieid
+
+    ET.SubElement(root, "staff").text = movie.get("staff", "")
+    ET.SubElement(root, "payid").text = "1"
+    ET.SubElement(root, "payprice").text = "0"
+    ET.SubElement(root, "upddt").text = "2000-01-01T00:00:00"
+
+    xml_str = ET.tostring(root, encoding="utf-8", xml_declaration=False)
+
+    return Response(xml_str, mimetype="application/xml")
+
+VIDEO_FOLDER = "Assets/Movie"
+
+@app.route("/v1025/url1/movie/<unk>/<filename>")
+def serve_movie(unk, filename):
+
+    if not filename.endswith(".mov"):
+        return abort(404)
+
+    # remove extension
+    base = filename[:-4]
+
+    # remove quality suffix if present
+    if base.endswith("-H") or base.endswith("-L"):
+        movieid = base[:-2]
+    else:
+        movieid = base
+
+    real_file = f"{movieid}.mov"
+    full_path = os.path.join(VIDEO_FOLDER, real_file)
+
+    if not os.path.exists(full_path):
+        return abort(404)
+
+    return send_from_directory(VIDEO_FOLDER, real_file)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=80)
