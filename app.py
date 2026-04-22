@@ -1365,11 +1365,10 @@ def caldaily(date):
 
     return Response(xml, mimetype="application/xml")
 
-
 # ----------------------------
 # Load Movie IDs
 # ----------------------------
-def load_movie_ids(path):
+def NewPayMovies_load_movie_ids(path):
     ids = []
 
     if not os.path.exists(path):
@@ -1387,7 +1386,7 @@ def load_movie_ids(path):
 # ----------------------------
 # Load Movie Meta
 # ----------------------------
-def load_movie_meta(path):
+def NewPayMovies_load_movie_meta(path):
     movies = {}
     current = {}
 
@@ -1417,8 +1416,8 @@ def load_movie_meta(path):
 @app.route("/v770/url3/pay/list/new/all.xml")
 def new_pay_movies():
 
-    movie_ids = load_movie_ids("files/NewPayMovies.txt")
-    meta = load_movie_meta("files/PayMovieMeta.txt")
+    movie_ids = NewPayMovies_load_movie_ids("files/NewPayMovies.txt")
+    meta = NewPayMovies_load_movie_meta("files/PayMovieMeta.txt")
 
     xml = []
     xml.append("<NewPayMovies>")
@@ -1455,6 +1454,7 @@ def new_pay_movies():
     xml.append("</NewPayMovies>")
 
     return Response("\n".join(xml), mimetype="application/xml")
+
 
 CATEGORY_FILE = "files/CategoryMovies.txt"
 MOVIE_META_FILE = "files/MovieMeta.txt"
