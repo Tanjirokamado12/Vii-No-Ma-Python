@@ -1450,7 +1450,8 @@ def MovieMeta(unk, movieid):
     xml_str = ET.tostring(root, encoding="utf-8", xml_declaration=False)
 
     return Response(xml_str, mimetype="application/xml")
-@app.route("/v1025/url1/movie/<unk>/<filename>")
+	
+@app.route("/v770/url1/movie/<unk>/<filename>")
 @app.route("/v1025/url1/movie/<unk>/<filename>")
 def serve_movie(unk, filename):
 
