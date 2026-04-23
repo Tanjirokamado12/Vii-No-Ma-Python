@@ -45,6 +45,8 @@ Patch the App Using Patcher/Patcher.py
 ---
 Note:If you have Any Issues,You're Free to Make a Issue on Issues,But if error code is 358404,is just the functionnality is not Avariable for Now (if Error 358404 show at channel startup,See the logs) or by Discord at @shorekeeper_oem
 
+-Wii shop Support is currently Being Added for Theater
+
 -Most lots of Support has been made for v770 and v1025
 
 -v0/v512 devloppement is not started yet.
