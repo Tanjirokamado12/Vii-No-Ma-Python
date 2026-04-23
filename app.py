@@ -11,13 +11,14 @@ from flask import Flask, Response
 import xml.etree.ElementTree as ET
 import os
 import re
+from flask import (
+    Flask, request, Response, send_file, send_from_directory,
+    jsonify, redirect, session, url_for, abort
+)
 
 app = Flask(__name__)
 
-# Base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Asset directories
 DIRS = {
     "calendar": os.path.join(BASE_DIR, "Assets", "Calendar"),
     "category": os.path.join(BASE_DIR, "Assets", "CategoryImages"),
@@ -33,20 +34,24 @@ DIRS = {
     "theatre_posters": os.path.join(BASE_DIR, "Assets", "Theatre", "Movie"),
     "movies_posters": os.path.join(BASE_DIR, "Assets","Movie"),
 }
-
-# Config + Crypto
 CONFIG_PATH = os.path.join(BASE_DIR, "Config", "v770config.txt")
 V1025_CONFIG_PATH = os.path.join(BASE_DIR, "Config", "v1025config.txt")
-
 KEY_HEX = "943B13DD87468BA5D9B7A8B899F91803"
 IV_HEX = "66B33FC1373FE506EC2B59FB6B977C82"
-
+POSTER_META_PATH = "Files/PosterMeta.txt"
+MOVIE_META_PATH = "Files/MovieMeta.txt"
 KEY = binascii.unhexlify(KEY_HEX)
 IV = binascii.unhexlify(IV_HEX)
+WEEKDAY_MAP = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+PAY_POSTER_META_PATH = "Files/PayPosterMeta.txt"
+PAY_MOVIE_META_PATH = "Files/PayMovieMeta.txt"
+CATEGORY_LIST_FILE_PATH = "Files/CategoryList.txt"
+caldaily_FILE_PATH = "files/caldaily.txt"
+caldaily_MOVIE_FILE = "files/MovieMeta.txt"
+CATEGORY_FILE = "files/CategoryMovies.txt"
+MOVIE_META_FILE = "files/MovieMeta.txt"
+VIDEO_FOLDER = "Assets/Movie"
 
-# -----------------------
-# Helper (safe file serving)
-# -----------------------
 def serve_file(directory, filename):
     if not os.path.exists(directory):
         abort(404, description="Directory not found")
@@ -56,10 +61,6 @@ def serve_file(directory, filename):
         abort(404, description="File not found")
 
     return send_from_directory(directory, filename)
-
-# -----------------------
-# Static endpoints
-# -----------------------
     
 @app.route('/v770/url1/calimg/<path:filename>')
 def calendar_images(filename):
@@ -127,30 +128,21 @@ def wall_files(filename):
 def pay_wall_files(filename):
     return serve_file(DIRS["pay_wall"], filename)
 
-# -----------------------
-# Dynamic encrypted endpoint
-# -----------------------
-
 @app.route('/conf/first.bin')
 @app.route('/v770/first.bin')
-def generate_first_bin():
-    # Check config exists
+def generate_config():
     if not os.path.exists(CONFIG_PATH):
         abort(404, description="Config file not found")
 
-    # Read config
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Replace placeholder with current host:port
-    host = request.host  # e.g. 192.168.1.27:80
+    host = request.host 
     content = content.replace("IPADRESS:PORT", host)
 
-    # Encrypt (AES-128-CBC)
     cipher = AES.new(KEY, AES.MODE_CBC, IV)
     encrypted = cipher.encrypt(pad(content.encode("utf-8"), AES.block_size))
 
-    # Return binary
     return Response(
         encrypted,
         mimetype="application/octet-stream",
@@ -160,24 +152,18 @@ def generate_first_bin():
     )
 
 @app.route('/v1025/first.bin')
-def v1025_generate_first_bin():
-    # Check config exists
+def v1025_generate_config():
     if not os.path.exists(V1025_CONFIG_PATH):
         abort(404, description="Config file not found")
 
-    # Read config
     with open(V1025_CONFIG_PATH, "r", encoding="utf-8") as f:
         content = f.read()
-
-    # Replace placeholder with current host:port
-    host = request.host  # e.g. 192.168.1.27:80
+    host = request.host 
     content = content.replace("IPADRESS:PORT", host)
 
-    # Encrypt (AES-128-CBC)
     cipher = AES.new(KEY, AES.MODE_CBC, IV)
     encrypted = cipher.encrypt(pad(content.encode("utf-8"), AES.block_size))
 
-    # Return binary
     return Response(
         encrypted,
         mimetype="application/octet-stream",
@@ -186,17 +172,12 @@ def v1025_generate_first_bin():
         }
     )
 
-
-# -----------------------
-# Run server
-# -----------------------
-
 def now():
     return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
 
 @app.route("/v770/url1/conf/datetime.xml")
-def datetime_xml():
+def datetimev770():
     xml = f"""<datetime>
 <upddt>{now()}</upddt>
 </datetime>"""
@@ -204,7 +185,7 @@ def datetime_xml():
 
 
 @app.route("/v1025/url2/reginfo.cgi")
-def reginfo():
+def regioninfo():
     t = now()
     xml = f"""<RegionInfo>
 <ver>1</ver>
@@ -214,10 +195,7 @@ def reginfo():
 </RegionInfo>"""
     return Response(xml, mimetype="application/xml")
 
-# ----------------------------- #
-# PARSE FILE
-# ----------------------------- #
-def parse_event_file(path="files/event.txt"):
+def Event_parse_event_file(path="files/event.txt"):
     data = {
         "color": "",
         "Frameid": "",
@@ -235,23 +213,20 @@ def parse_event_file(path="files/event.txt"):
             if not line:
                 continue
 
-            # ---------------- POSTER ----------------
             if line.startswith("Posterid:"):
                 data["poster_blocks"].append({
                     "posterid": line.split(":", 1)[1].strip(),
                     "linktype": "0",
                     "linkid": ""
                 })
-                current_intro = None  # reset context
-
-            # ---------------- NEWS ----------------
+                current_intro = None  
             elif line.startswith("News:"):
                 data["news_blocks"].append(
                     line.split(":", 1)[1].strip()
                 )
                 current_intro = None
 
-            # ---------------- INTRO ----------------
+
             elif line.startswith("Cntid:"):
                 current_intro = {
                     "cntid": line.split(":", 1)[1].strip(),
@@ -260,7 +235,7 @@ def parse_event_file(path="files/event.txt"):
                 }
                 data["intro_blocks"].append(current_intro)
 
-            # ---------------- LINK HANDLING ----------------
+
             elif line.startswith("LinkType:"):
                 value = line.split(":", 1)[1].strip()
 
@@ -277,7 +252,7 @@ def parse_event_file(path="files/event.txt"):
                 elif data["poster_blocks"]:
                     data["poster_blocks"][-1]["linkid"] = value
 
-            # ---------------- OTHER ----------------
+
             elif line.startswith("Color:"):
                 data["color"] = line.split(":", 1)[1].strip()
 
@@ -287,10 +262,7 @@ def parse_event_file(path="files/event.txt"):
     return data
 
 
-# ----------------------------- #
-# NEWS
-# ----------------------------- #
-def build_news(news_list):
+def Event_build_news(news_list):
     return "\n".join(
         f"""<newsinfo>
     <page>{i}</page>
@@ -300,10 +272,7 @@ def build_news(news_list):
     )
 
 
-# ----------------------------- #
-# INTRO
-# ----------------------------- #
-def build_intro(intro_list):
+def Event_build_intro(intro_list):
     blocks = []
 
     for i, item in enumerate(intro_list, start=1):
@@ -311,7 +280,7 @@ def build_intro(intro_list):
         linktype = item.get("linktype", "0")
         linkid = item.get("linkid", "")
 
-        # build link section
+
         if linktype == "0":
             link_xml = f"<linktype>0</linktype>"
         else:
@@ -350,19 +319,16 @@ def build_intro(intro_list):
     return "\n".join(blocks)
 
 
-# ----------------------------- #
-# POSTER
-# ----------------------------- #
-def build_poster(version, poster_list):
+def Event_build_PosterInfo(version, poster_list):
 
-    # -------- v770 --------
+
     if str(version) == "770":
         return "\n".join(
             f"""<posterid>{p["posterid"]}</posterid>"""
             for p in poster_list
         )
 
-    # -------- v1025 --------
+
     if str(version) == "1025":
         return "\n".join(
             f"""<posterinfo>
@@ -375,19 +341,16 @@ def build_poster(version, poster_list):
     return ""
 
 
-# ----------------------------- #
-# ROUTE
-# ----------------------------- #
 @app.route("/v<int:version>/url1/event/today.xml")
-def event_today(version):
+def Event(version):
 
-    data = parse_event_file("files/event.txt")
+    data = Event_parse_event_file("files/event.txt")
 
     today = date.today().isoformat()
 
-    news_xml = build_news(data["news_blocks"])
-    intro_xml = build_intro(data["intro_blocks"])
-    poster_xml = build_poster(version, data["poster_blocks"])
+    news_xml = Event_build_news(data["news_blocks"])
+    intro_xml = Event_build_intro(data["intro_blocks"])
+    poster_xml = Event_build_PosterInfo(version, data["poster_blocks"])
 
     xml = f"""<Event>
   <ver>1</ver>
@@ -409,10 +372,7 @@ def event_today(version):
     return Response(xml, mimetype="application/xml")
 
 
-# -----------------------------
-# PARSE FILE (PAGEINFO)
-# -----------------------------
-def parse_page_file(path="files/SpPage.txt"):
+def SpPageList_parse_page_file(path="files/SpPage.txt"):
     data = {
         "version": "1",
         "upddt": "2026-01-01T00:00:00",
@@ -469,10 +429,7 @@ def parse_page_file(path="files/SpPage.txt"):
     return data
 
 
-# -----------------------------
-# BUILD PAGEINFO XML
-# -----------------------------
-def build_pageinfo(pages):
+def SpPageList_build_pageinfo(pages):
     return "\n".join(
         f"""<pageinfo>
     <sppageid>{p['sppageid']}</sppageid>
@@ -489,25 +446,23 @@ def build_pageinfo(pages):
         for p in pages
     )
 
-
-# -----------------------------
-# ROUTE
-# -----------------------------
 @app.route("/v<int:version>/url1/special/all.xml")
-def sppage(version):
+def SpPageList(version):
 
-    data = parse_page_file("files/SpPageList.txt")
+    data = SpPageList_parse_page_file("files/SpPageList.txt")
 
     xml = f"""<SpPageList>
   <ver>1</ver>
-{build_pageinfo(data["pages"])}
+{SpPageList_build_pageinfo(data["pages"])}
 
   <upddt>{data["upddt"]}</upddt>
 </SpPageList>"""
 
     return Response(xml, mimetype="application/xml")
+	
 
-def parse_payeven_file(filepath):
+
+def PayEvent_parse_payeven_file(filepath):
     data = {
         "Posterid1": "",
         "Posterid2": "",
@@ -523,7 +478,6 @@ def parse_payeven_file(filepath):
             if not line:
                 continue
 
-            # Start new IntroInfo block
             if line == "IntroInfo":
                 if current_intro:
                     data["intros"].append(current_intro)
@@ -546,7 +500,6 @@ def parse_payeven_file(filepath):
                 else:
                     data[key] = value
 
-    # Add last intro block
     if current_intro:
         data["intros"].append(current_intro)
 
@@ -554,16 +507,15 @@ def parse_payeven_file(filepath):
 
 
 @app.route('/v<int:version>/url3/pay/event/today.xml')
-def pay_event(version):
+def PayEvent(version):
     file_path = os.path.join("files", "PayEvent.txt")
 
     if not os.path.exists(file_path):
         return Response("File not found", status=404)
 
-    data = parse_payeven_file(file_path)
+    data = PayEvent_parse_payeven_file(file_path)
     today = date.today().isoformat()
 
-    # Build introinfo XML blocks
     intro_xml = ""
     for i, intro in enumerate(data["intros"], start=1):
         linkid_xml = ""
@@ -584,7 +536,6 @@ def pay_event(version):
 </introinfo>
 """
 
-    # Final XML
     xml = f"""
 <PayEvent>
 <ver>1</ver>
@@ -612,8 +563,8 @@ def pay_event(version):
 """
 
     return Response(xml, mimetype="application/xml")
-
-def movielink_parse_file(filepath):
+	
+def MovieLink_parse_file(filepath):
     groups = []
     current = {}
 
@@ -633,35 +584,33 @@ def movielink_parse_file(filepath):
                     key, value = line.split(":", 1)
                     current[key.strip().lower()] = value.strip()
 
-        # append last group
         if current:
             groups.append(current)
 
     return groups
 
 
-def movielink_build_xml(groups, version):
+def MovieLink_build_xml(groups, version):
     root = ET.Element("MovieLink")
 
     ver = ET.SubElement(root, "ver")
     ver.text = "1"
 
     for g in groups:
-        # 👉 skip entire block if v770 and no paymovid
+
         if version == "v770" and "paymovid" not in g:
             continue
 
         linkinfo = ET.SubElement(root, "linkinfo")
 
-        # always include movieid
         if "movieid" in g:
             ET.SubElement(linkinfo, "movieid").text = g["movieid"]
 
         if version == "v770":
-            # only include paymovid
+
             ET.SubElement(linkinfo, "paymovid").text = g["paymovid"]
         else:
-            # include all available fields
+
             for key in ["paymovid", "categid", "shopid"]:
                 if key in g:
                     ET.SubElement(linkinfo, key).text = g[key]
@@ -669,27 +618,14 @@ def movielink_build_xml(groups, version):
     return ET.tostring(root, encoding="utf-8")
 
 @app.route('/<version>/url1/conf2/paylink.xml')
-def paylink(version):
-    groups = movielink_parse_file("Files/MovieLink.txt")
-    xml_data = movielink_build_xml(groups, version)
+def MovieLink(version):
+    groups = MovieLink_parse_file("Files/MovieLink.txt")
+    xml_data = MovieLink_build_xml(groups, version)
 
     return Response(xml_data, mimetype="application/xml")
 
 
-POSTER_META_PATH = "Files/PosterMeta.txt"
-MOVIE_META_PATH = "Files/MovieMeta.txt"
-
-# ----------------------------
-# CONFIG
-# ----------------------------
-
-WEEKDAY_MAP = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
-
-# ----------------------------
-# LOAD MOVIE META
-# ----------------------------
-
-def load_movies():
+def Calendar_load_movies():
     movies = {}
     current = {}
 
@@ -716,11 +652,7 @@ def load_movies():
     return movies
 
 
-# ----------------------------
-# LOAD CALENDAR DAILY
-# ----------------------------
-
-def load_caldaily():
+def Calendar_load_caldaily():
     data = {}
     default_blocks = []
     default_movieids = []
@@ -736,9 +668,6 @@ def load_caldaily():
             if not line:
                 continue
 
-            # -------------------------
-            # DATE
-            # -------------------------
             if line.startswith("Date:"):
                 current_date = line.split(":", 1)[1].strip()
                 data[current_date] = {
@@ -749,17 +678,11 @@ def load_caldaily():
                 current_block = None
                 continue
 
-            # -------------------------
-            # DEFAULT SECTION
-            # -------------------------
             if line.startswith("Default String"):
                 mode = "default"
                 current_block = None
                 continue
 
-            # -------------------------
-            # TINDEX BLOCK
-            # -------------------------
             if line.startswith("Tindex:"):
                 block = {
                     "Tindex": line.split(":", 1)[1].strip(),
@@ -779,9 +702,6 @@ def load_caldaily():
 
                 continue
 
-            # -------------------------
-            # MOVIE IDS
-            # -------------------------
             if line.startswith("movieid:"):
                 mid = line.split(":", 1)[1].strip()
 
@@ -792,9 +712,6 @@ def load_caldaily():
 
                 continue
 
-            # -------------------------
-            # BLOCK VALUES
-            # -------------------------
             if ":" in line and current_block is not None:
                 k, v = line.split(":", 1)
                 current_block[k.strip()] = v.strip()
@@ -802,27 +719,19 @@ def load_caldaily():
     return data, default_blocks, default_movieids
 
 
-# ----------------------------
-# GET WEEK (MON-SUN)
-# ----------------------------
-
-def get_week_dates(date_str):
+def Calendar_get_week_dates(date_str):
     d = datetime.strptime(date_str, "%Y%m%d")
     start = d - timedelta(days=d.weekday())
     return [start + timedelta(days=i) for i in range(7)]
 
-
-# ----------------------------
-# BUILD XML
-# ----------------------------
-def build_calendar(date_str):
-    movies = load_movies()
-    caldaily, default_blocks, default_movieids = load_caldaily()
+def Calendar_build_calendar(date_str):
+    movies = Calendar_load_movies()
+    caldaily, default_blocks, default_movieids = Calendar_load_caldaily()
 
     root = ET.Element("Calendar")
     ET.SubElement(root, "ver").text = "1"
 
-    week_dates = get_week_dates(date_str)
+    week_dates = Calendar_get_week_dates(date_str)
 
     for i, day in enumerate(week_dates):
         date_key = day.strftime("%Y-%m-%d")
@@ -833,9 +742,6 @@ def build_calendar(date_str):
         ET.SubElement(dayinfo, "holiday").text = "0"
         ET.SubElement(dayinfo, "thead").text = "Thead"
 
-        # -------------------------
-        # USE DATE OR DEFAULT
-        # -------------------------
         if date_key in caldaily:
             movie_ids = caldaily[date_key]["movieids"]
             blocks = caldaily[date_key]["blocks"]
@@ -843,9 +749,7 @@ def build_calendar(date_str):
             movie_ids = default_movieids
             blocks = default_blocks
 
-        # -------------------------
-        # BUILD MOVIES
-        # -------------------------
+
         for idx, mid in enumerate(movie_ids[:3], start=1):
             movieinfo = ET.SubElement(dayinfo, "movieinfo")
 
@@ -858,29 +762,20 @@ def build_calendar(date_str):
             ET.SubElement(movieinfo, "strdt").text = "2000-01-01T00:00:00"
             ET.SubElement(movieinfo, "enddt").text = "2036-01-01T00:00:00"
 
-        # (optional) you can also output Tindex blocks if needed
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=False)
 
 
-# ----------------------------
-# FLASK ROUTE
-# ----------------------------
-
 @app.route("/v770/url1/cal/<date>.xml")
-def calendar(date):
+def Calendar(date):
     try:
-        xml_data = build_calendar(date)
+        xml_data = Calendar_build_calendar(date)
         return Response(xml_data, mimetype="application/xml")
     except Exception as e:
         return Response(f"<error>{str(e)}</error>", mimetype="application/xml", status=500)
 
 
-# ----------------------------
-# RUN APP
-# ----------------------------
-
-def parse_blocks(file_path):
+def PosterMeta_parse_blocks(file_path):
     """Parse blocks separated by blank lines into dicts"""
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read().strip()
@@ -900,9 +795,8 @@ def parse_blocks(file_path):
 
 @app.route("/v770/url1/wall/<posterid>.met")
 @app.route("/v1025/url1/wall/<posterid>.met")
-def get_poster_meta(posterid):
-    # Load poster meta
-    poster_data = parse_blocks(POSTER_META_PATH)
+def PosterMeta(posterid):
+    poster_data = PosterMeta_parse_blocks(POSTER_META_PATH)
 
     movie_id = None
     for entry in poster_data:
@@ -913,8 +807,7 @@ def get_poster_meta(posterid):
     if not movie_id:
         return Response("Poster not found", status=404)
 
-    # Load movie meta
-    movie_data = parse_blocks(MOVIE_META_PATH)
+    movie_data = PosterMeta_parse_blocks(MOVIE_META_PATH)
 
     title = "Unknown"
     for entry in movie_data:
@@ -922,7 +815,6 @@ def get_poster_meta(posterid):
             title = entry.get("Title", "Unknown")
             break
 
-    # Build XML response
     xml_response = f"""<PosterMeta>
     <ver>1</ver>
     <posterid>{posterid}</posterid>
@@ -933,12 +825,9 @@ def get_poster_meta(posterid):
 """
 
     return Response(xml_response, mimetype="application/xml")
+	
 
-PAY_POSTER_META_PATH = "Files/PayPosterMeta.txt"
-PAY_MOVIE_META_PATH = "Files/PayMovieMeta.txt"
-
-
-def parse_blocks(file_path):
+def PayPosterMeta_parse_blocks(file_path):
     """Parse blocks separated by blank lines into dicts"""
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read().strip()
@@ -959,13 +848,12 @@ def parse_blocks(file_path):
 
 @app.route("/v770/url3/pay/wall/<posterid>.met")
 @app.route("/v1025/url3/pay/wall/<posterid>.met")
-def pay_get_poster_meta(posterid):
+def PayPosterMeta(posterid):
 
-    # Load poster meta
-    poster_data = parse_blocks(PAY_POSTER_META_PATH)
+    poster_data = PayPosterMeta_parse_blocks(PAY_POSTER_META_PATH)
 
     movie_id = None
-    poster_type = "1"   # default type if not found
+    poster_type = "1" 
 
     for entry in poster_data:
         if entry.get("PosterId") == posterid:
@@ -976,8 +864,7 @@ def pay_get_poster_meta(posterid):
     if not movie_id:
         return Response("Poster not found", status=404)
 
-    # Load movie meta
-    movie_data = parse_blocks(PAY_MOVIE_META_PATH)
+    movie_data = PayPosterMeta_parse_blocks(PAY_MOVIE_META_PATH)
 
     title = "Unknown"
     aspect = "0"
@@ -988,7 +875,6 @@ def pay_get_poster_meta(posterid):
             aspect = entry.get("aspect", "0")
             break
 
-    # Build XML response (matching your required format)
     xml_response = f"""<PayPosterMeta>
 <ver>1</ver>
 <posterid>{posterid}</posterid>
@@ -1000,17 +886,15 @@ def pay_get_poster_meta(posterid):
 """
 
     return Response(xml_response, mimetype="application/xml")
-    
+	
 @app.route("/v770/url1/conf/eula.xml")
 @app.route("/v1025/url1/conf/eula.xml")
-def eula_xml():
+def LicenseAgree():
     file_path = os.path.join("files", "eula.txt")
 
-    # read the text file
     with open(file_path, "r", encoding="utf-8") as f:
         eula_text = f.read().strip()
 
-    # build XML response
     xml = f"""<LicenseAgree>
   <ver>1</ver>
   <agree>{eula_text}</agree>
@@ -1018,7 +902,7 @@ def eula_xml():
 
     return Response(xml, mimetype="application/xml")
 
-def parse_txt_to_xml(path):
+def PayCategoryHeader_parse_txt_to_xml(path):
     with open(path, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
@@ -1038,7 +922,6 @@ def parse_txt_to_xml(path):
             img_value = line.split(":", 1)[1].strip()
 
         elif line == "Listinfo":
-            # next expected fields
             type_val = None
             name_val = None
 
@@ -1049,17 +932,15 @@ def parse_txt_to_xml(path):
                 elif lines[i].startswith("Name:"):
                     name_val = lines[i].split(":", 1)[1].strip()
                 i += 1
-            i -= 1  # step back because outer loop will i += 1
+            i -= 1  
 
             listinfo_elements.append((type_val, name_val))
 
         i += 1
 
-    # img node
     img = ET.SubElement(root, "img")
     img.text = img_value if img_value else "0"
 
-    # listinfo nodes
     for idx, (t, n) in enumerate(listinfo_elements, start=1):
         li = ET.SubElement(root, "listinfo")
 
@@ -1076,14 +957,12 @@ def parse_txt_to_xml(path):
 
 @app.route("/v770/url3/pay/list/category/header.xml")
 @app.route("/v1025/url3/pay/list/category/header.xml")
-def header_xml():
-    xml_data = parse_txt_to_xml("Files/PayCategoryHeader.txt")
+def PayCategoryHeader():
+    xml_data = PayCategoryHeader_parse_txt_to_xml("Files/PayCategoryHeader.txt")
     return Response(xml_data, mimetype="application/xml")
 
-CATEGORY_LIST_FILE_PATH = "Files/CategoryList.txt"
 
-
-def load_categories():
+def CategoryList_load_categories():
     categories = []
 
     with open(CATEGORY_LIST_FILE_PATH, "r", encoding="utf-8") as f:
@@ -1104,7 +983,7 @@ def load_categories():
             elif line.startswith("Name:"):
                 block["name"] = line.split(":", 1)[1].strip()
 
-        # last block
+
         if block:
             categories.append(block)
 
@@ -1112,8 +991,8 @@ def load_categories():
 
 @app.route("/v770/url1/list/category/01.xml")
 @app.route("/v1025/url1/list/category/01.xml")
-def category_list():
-    categories = load_categories()
+def CategoryList():
+    categories = CategoryList_load_categories()
 
     xml = []
     xml.append("<CategoryList>")
@@ -1133,7 +1012,7 @@ def category_list():
 
 @app.route("/v770/url1/beacon/<path:request>")
 @app.route("/v1025/url1/beacon/<path:request>")
-def beacon(request):
+def SampleRequest(request):
     xml_response = """<SampleRequest>
   <code>1</code>
   <msg>Viinoma</msg>
@@ -1141,21 +1020,10 @@ def beacon(request):
 
     return Response(xml_response, mimetype="application/xml")
 
-caldaily_FILE_PATH = "files/caldaily.txt"
-caldaily_MOVIE_FILE = "files/MovieMeta.txt"
-
-
-# ----------------------------
-# WEEKDAY
-# ----------------------------
 def caldaily_get_calwday(date_str):
     dt = datetime.strptime(date_str, "%Y-%m-%d")
     return ["MO", "TU", "WE", "TH", "FR", "SA", "SU"][dt.weekday()]
 
-
-# ----------------------------
-# MOVIE META LOADER
-# ----------------------------
 def caldaily_load_movie_meta():
     with open(caldaily_MOVIE_FILE, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
@@ -1175,11 +1043,7 @@ def caldaily_load_movie_meta():
 
     return movies
 
-
-# ----------------------------
-# CALDAILY PARSER
-# ----------------------------
-def parse_caldaily_file():
+def Caldaily_parse_caldaily_file():
     with open(caldaily_FILE_PATH, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
@@ -1191,7 +1055,7 @@ def parse_caldaily_file():
     current_default = None
     in_default = False
 
-    def start_block():
+    def Caldaily_start_block():
         return {
             "Tindex": None,
             "Thead": "",
@@ -1202,13 +1066,13 @@ def parse_caldaily_file():
             "movieid": []
         }
 
-    def flush_date():
+    def Caldaily_flush_date():
         nonlocal current_block
         if current_date and current_block and current_block["Tindex"] is not None:
             entries.setdefault(current_date, []).append(current_block)
         current_block = None
 
-    def flush_default():
+    def Caldaily_flush_default():
         nonlocal current_default
         if current_default and current_default["Tindex"] is not None:
             default_blocks.append(current_default)
@@ -1216,28 +1080,23 @@ def parse_caldaily_file():
 
     for line in lines:
 
-        # -------------------------
-        # DATE
-        # -------------------------
         if line.startswith("Date:"):
-            flush_date()
-            flush_default()
+            Caldaily_flush_date()
+            Caldaily_flush_default()
 
             current_date = line.split(":", 1)[1].strip()
-            current_block = start_block()
+            current_block = Caldaily_start_block()
             in_default = False
             continue
 
-        # -------------------------
-        # DEFAULT
-        # -------------------------
+
         if line.startswith("Default String"):
-            flush_date()
-            flush_default()
+            Caldaily_flush_date()
+            Caldaily_flush_default()
 
             current_date = None
             current_block = None
-            current_default = start_block()
+            current_default = Caldaily_start_block()
             in_default = True
             continue
 
@@ -1247,25 +1106,19 @@ def parse_caldaily_file():
         k, v = line.split(":", 1)
         k, v = k.strip(), v.strip()
 
-        # -------------------------
-        # NEW TRIVIA BLOCK
-        # -------------------------
         if k == "Tindex":
 
             if in_default:
-                flush_default()
-                current_default = start_block()
+                Caldaily_flush_default()
+                current_default = Caldaily_start_block()
                 current_default["Tindex"] = v
                 continue
             else:
-                flush_date()
-                current_block = start_block()
+                Caldaily_flush_date()
+                current_block = Caldaily_start_block()
                 current_block["Tindex"] = v
                 continue
 
-        # -------------------------
-        # ASSIGN FIELDS
-        # -------------------------
         target = current_default if in_default else current_block
 
         if target is None:
@@ -1276,16 +1129,12 @@ def parse_caldaily_file():
         else:
             target[k] = v
 
-    flush_date()
-    flush_default()
+    Caldaily_flush_date()
+    Caldaily_flush_default()
 
     return entries, default_blocks
 
-
-# ----------------------------
-# BUILD MOVIE INFO
-# ----------------------------
-def build_movieinfo(movie_ids, movie_meta):
+def Caldaily_build_movieinfo(movie_ids, movie_meta):
     xml = ""
 
     for i, mid in enumerate(movie_ids):
@@ -1303,11 +1152,7 @@ def build_movieinfo(movie_ids, movie_meta):
 
     return xml
 
-
-# ----------------------------
-# BUILD XML
-# ----------------------------
-def build_xml(blocks, date_str, calwday, movie_meta):
+def Caldaily_build_xml(blocks, date_str, calwday, movie_meta):
 
     trivia_xml = ""
 
@@ -1328,10 +1173,9 @@ def build_xml(blocks, date_str, calwday, movie_meta):
 </trivia>
 """
 
-    # remove duplicates but keep order
     all_movie_ids = list(dict.fromkeys(all_movie_ids))
 
-    movie_xml = build_movieinfo(all_movie_ids, movie_meta)
+    movie_xml = Caldaily_build_movieinfo(all_movie_ids, movie_meta)
 
     return f"""<CalDaily>
 <ver>1</ver>
@@ -1343,13 +1187,10 @@ def build_xml(blocks, date_str, calwday, movie_meta):
 </CalDaily>"""
 
 
-# ----------------------------
-# ROUTE
-# ----------------------------
 @app.route("/v770/url1/caldaily/<date>.xml")
-def caldaily(date):
+def Caldaily(date):
 
-    entries, default_blocks = parse_caldaily_file()
+    entries, default_blocks = Caldaily_parse_caldaily_file()
     movie_meta = caldaily_load_movie_meta()
 
     formatted = f"{date[:4]}-{date[4:6]}-{date[6:]}"
@@ -1361,13 +1202,11 @@ def caldaily(date):
 
     calwday = caldaily_get_calwday(formatted)
 
-    xml = build_xml(blocks, formatted, calwday, movie_meta)
+    xml = Caldaily_build_xml(blocks, formatted, calwday, movie_meta)
 
     return Response(xml, mimetype="application/xml")
 
-# ----------------------------
-# Load Movie IDs
-# ----------------------------
+
 def NewPayMovies_load_movie_ids(path):
     ids = []
 
@@ -1382,10 +1221,6 @@ def NewPayMovies_load_movie_ids(path):
 
     return ids
 
-
-# ----------------------------
-# Load Movie Meta
-# ----------------------------
 def NewPayMovies_load_movie_meta(path):
     movies = {}
     current = {}
@@ -1410,11 +1245,8 @@ def NewPayMovies_load_movie_meta(path):
     return movies
 
 
-# ----------------------------
-# XML Route
-# ----------------------------
 @app.route("/v770/url3/pay/list/new/all.xml")
-def new_pay_movies():
+def NewPayMovies():
 
     movie_ids = NewPayMovies_load_movie_ids("files/NewPayMovies.txt")
     meta = NewPayMovies_load_movie_meta("files/PayMovieMeta.txt")
@@ -1455,15 +1287,7 @@ def new_pay_movies():
 
     return Response("\n".join(xml), mimetype="application/xml")
 
-
-CATEGORY_FILE = "files/CategoryMovies.txt"
-MOVIE_META_FILE = "files/MovieMeta.txt"
-
-
-# ----------------------------
-# CATEGORY PARSER
-# ----------------------------
-def parse_category_file(categid):
+def CategorySearch_parse_category_file(categid):
     movie_ids = []
     found = False
 
@@ -1486,10 +1310,7 @@ def parse_category_file(categid):
     return movie_ids
 
 
-# ----------------------------
-# MOVIE META PARSER
-# ----------------------------
-def load_movie_meta():
+def CategorySearch_load_movie_meta():
     meta = {}
 
     with open(MOVIE_META_FILE, "r", encoding="utf-8") as f:
@@ -1527,15 +1348,11 @@ def load_movie_meta():
 
     return meta
 
-
-# ----------------------------
-# ROUTE
-# ----------------------------
 @app.route("/v770/url1/list/category/search/<categid>")
 @app.route("/v1025/url1/list/category/search/<categid>")
-def search_category(categid):
+def CategorySearch(categid):
 
-    movie_ids = parse_category_file(categid)
+    movie_ids = CategorySearch_parse_category_file(categid)
 
     if not movie_ids:
         return Response(
@@ -1543,7 +1360,7 @@ def search_category(categid):
             mimetype="application/xml"
         )
 
-    meta = load_movie_meta()
+    meta = CategorySearch_load_movie_meta()
 
     root = ET.Element("CategoryMovies")
 
@@ -1566,12 +1383,8 @@ def search_category(categid):
     xml_data = ET.tostring(root, encoding="utf-8")
 
     return Response(xml_data, mimetype="application/xml")
-    
 
-# -----------------------------
-# Load and parse movie file
-# -----------------------------
-def load_moviesMetaData(path="files/moviemeta.txt"):
+def MovieMeta_load_moviesMetaData(path="files/moviemeta.txt"):
     movies = {}
     current = {}
 
@@ -1579,7 +1392,6 @@ def load_moviesMetaData(path="files/moviemeta.txt"):
         for line in f:
             line = line.strip()
 
-            # blank line = end of block
             if not line:
                 if "MovieId" in current:
                     movies[current["MovieId"]] = current
@@ -1590,22 +1402,18 @@ def load_moviesMetaData(path="files/moviemeta.txt"):
                 key, value = line.split(":", 1)
                 current[key.strip()] = value.strip()
 
-        # last block
         if "MovieId" in current:
             movies[current["MovieId"]] = current
 
     return movies
 
 
-movies_db = load_moviesMetaData()
+movies_db = MovieMeta_load_moviesMetaData()
 
 
-# -----------------------------
-# Route
-# -----------------------------
 @app.route("/v770/url1/movie/<unk>/<movieid>.met")
 @app.route("/v1025/url1/movie/<unk>/<movieid>.met")
-def MovieMetaData(unk, movieid):
+def MovieMeta(unk, movieid):
     movie = movies_db.get(movieid)
 
     if not movie:
@@ -1615,9 +1423,6 @@ def MovieMetaData(unk, movieid):
             status=404
         )
 
-    # -----------------------------
-    # Build XML
-    # -----------------------------
     root = ET.Element("MovieMeta")
 
     ET.SubElement(root, "ver").text = "1"
@@ -1634,7 +1439,6 @@ def MovieMetaData(unk, movieid):
 
     ET.SubElement(root, "dsdist").text = dsdist
 
-    # ✅ condition: only include dsmovid if dsdist != "0"
     if dsdist != "0":
         ET.SubElement(root, "dsmovid").text = movieid
 
@@ -1647,18 +1451,14 @@ def MovieMetaData(unk, movieid):
 
     return Response(xml_str, mimetype="application/xml")
 
-VIDEO_FOLDER = "Assets/Movie"
-
 @app.route("/v1025/url1/movie/<unk>/<filename>")
 def serve_movie(unk, filename):
 
     if not filename.endswith(".mov"):
         return abort(404)
 
-    # remove extension
     base = filename[:-4]
 
-    # remove quality suffix if present
     if base.endswith("-H") or base.endswith("-L"):
         movieid = base[:-2]
     else:
@@ -1671,6 +1471,6 @@ def serve_movie(unk, filename):
         return abort(404)
 
     return send_from_directory(VIDEO_FOLDER, real_file)
-
+    
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=80)
