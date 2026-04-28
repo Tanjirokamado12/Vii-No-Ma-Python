@@ -1,14 +1,19 @@
 PosterId:1
 MovieId:1
+msg:Bye bye bye
 
 PosterId:2
 MovieId:2
+msg:Bye bye bye
 
 PosterId:3
 MovieId:3
+msg:Bye bye bye
 
 PosterId:4
 MovieId:4
+msg:Bye bye bye
 
 PosterId:5
 MovieId:5
+msg:Bye bye bye

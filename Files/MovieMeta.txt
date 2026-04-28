@@ -1,10 +1,10 @@
 MovieId:1
 Title:Movie1
-Aspect:1
-genre:0
-len:00:00:00
+Aspect:0
+genre:5
+len:00:03:58
 SpPageid:1
-dsdist:0
+dsdist:1
 staff:1
 
 MovieId:2

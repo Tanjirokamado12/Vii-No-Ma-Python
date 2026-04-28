@@ -9,13 +9,5 @@ LinkType:0
 Linkid:0
 IntroInfo
 Cntid:0000000000000000
-LinkType:0
-Linkid:0
-IntroInfo
-Cntid:0000000000000000
-LinkType:0
-Linkid:0
-IntroInfo
-Cntid:3
-LinkType:0
-Linkid:0
+LinkType:5
+Linkid:10000

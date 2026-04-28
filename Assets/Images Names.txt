@@ -4,7 +4,7 @@ for /Calendar/ is should be Date as YYYYMMDD-TINDEX.jpg set on /files/Caldaily.t
 for /CategoryImages/ is should be Categid.jpg /files/CategoryList.txt
 for /Intro/ is should be Seq-Cntid.jpg (For dertermine Seq count the occurence of CntId (for example if cntid is the third time is shown seq is 3) set /files/Event.txt (same for /assets/Theatre/info but based on /files/PayEvent.txt)
 for /Movie/ is should be Movieid.jpg set on /Files/MovieMeta.txt
-for /Theatre/Movie/ is should be Movieid.jpg but based on /Files/PayMovieMeta.txt
+for /Theatre/Movie/ is should be Movieid.jpg but based on /Files/PayMovieMeta.txt (and for dimg:D_Movieid_Imageid.jpg)
 for /Theatre/Wall/ is should %sPosterid.jpg and %sframeid.jpg set on /files/Payevent.txt
 
 Note:Not Everything has been added Yet.Is only for Channel Startup

@@ -11,6 +11,7 @@ from flask import Flask, Response
 import xml.etree.ElementTree as ET
 import os
 import re
+import random
 from flask import (
     Flask, request, Response, send_file, send_from_directory,
     jsonify, redirect, session, url_for, abort
@@ -81,6 +82,9 @@ def coupon_files(filename):
 def delivery_files(filename):
     return serve_file(DIRS["delivery"], filename)
 
+@app.route("/v770/url3/pay/movie/<unk>/<movieid>/D_<filename>.jpg")
+def theatre_movie_jpg(unk, movieid, filename):
+    return serve_file(DIRS["theatre_posters"], f"D_{filename}.jpg")
 
 @app.route('/v1025/url1/intro/<path:filename>')
 def intro_files(filename):
@@ -285,7 +289,9 @@ def Event_build_intro(intro_list):
             link_xml = f"<linktype>0</linktype>"
         else:
             link_xml = f"""<linktype>{linktype}</linktype>
-    <linkid>{linkid}</linkid>"""
+    <linkid>{linkid}</linkid>
+    <catname>Hi</catname>"""
+
 
         if len(cntid) >= 16:
             blocks.append(f"""<introinfo>
@@ -799,9 +805,12 @@ def PosterMeta(posterid):
     poster_data = PosterMeta_parse_blocks(POSTER_META_PATH)
 
     movie_id = None
+    msg = "Unknown"
+
     for entry in poster_data:
         if entry.get("PosterId") == posterid:
             movie_id = entry.get("MovieId")
+            msg = entry.get("msg", "Unknown")
             break
 
     if not movie_id:
@@ -818,14 +827,13 @@ def PosterMeta(posterid):
     xml_response = f"""<PosterMeta>
     <ver>1</ver>
     <posterid>{posterid}</posterid>
-    <msg>{title}</msg>
+    <msg>{msg}</msg>
     <movieid>{movie_id}</movieid>
     <title>{title}</title>
 </PosterMeta>
 """
 
     return Response(xml_response, mimetype="application/xml")
-	
 
 def PayPosterMeta_parse_blocks(file_path):
     """Parse blocks separated by blank lines into dicts"""
@@ -989,6 +997,8 @@ def CategoryList_load_categories():
 
     return categories
 
+@app.route("/v770/url1/list/category/02.xml")
+@app.route("/v1025/url1/list/category/02.xml")
 @app.route("/v770/url1/list/category/01.xml")
 @app.route("/v1025/url1/list/category/01.xml")
 def CategoryList():
@@ -1414,6 +1424,8 @@ movies_db = MovieMeta_load_moviesMetaData()
 @app.route("/v770/url1/movie/<unk>/<movieid>.met")
 @app.route("/v1025/url1/movie/<unk>/<movieid>.met")
 def MovieMeta(unk, movieid):
+    movies_db = MovieMeta_load_moviesMetaData()  # reload every time
+
     movie = movies_db.get(movieid)
 
     if not movie:
@@ -1472,6 +1484,288 @@ def serve_movie(unk, filename):
         return abort(404)
 
     return send_from_directory(VIDEO_FOLDER, real_file)
+
+def SearchMovies_load_movies():
+    with open("files/MovieMeta.txt", "r", encoding="utf-8") as f:
+        content = f.read()
+
+    blocks = content.strip().split("\n\n")
+    movies = []
+
+    for block in blocks:
+        movie = {}
+        for line in block.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                movie[key.strip()] = value.strip()
+        if movie:
+            movies.append(movie)
+
+    return movies
+
+@app.route("/v770/url2/search.cgi")
+@app.route("/v1025/url2/search.cgi")
+def SearchMovies():
+    query = request.args.get("q", "").lower()
+
+    all_movies = SearchMovies_load_movies()
+
+    # filter by title
+    matches = [
+        m for m in all_movies
+        if query in m.get("Title", "").lower()
+    ]
+
+    root = ET.Element("SearchMovies")
+    ET.SubElement(root, "ver").text = "1"
+    ET.SubElement(root, "num").text = str(len(matches))
+
+    for i, m in enumerate(matches, start=1):
+        movieinfo = ET.SubElement(root, "movieinfo")
+
+        ET.SubElement(movieinfo, "rank").text = str(i)
+        ET.SubElement(movieinfo, "movieid").text = m.get("MovieId", "0")
+        ET.SubElement(movieinfo, "title").text = m.get("Title", "")
+        ET.SubElement(movieinfo, "genre").text = m.get("genre", "0")
+
+        # you don't have a date → put a default or map something else
+        ET.SubElement(movieinfo, "strdt").text = "2000-01-01T00:00:00"
+
+        ET.SubElement(movieinfo, "pop").text = "0"
+
+    xml_str = ET.tostring(root, encoding="utf-8")
+
+    return Response(xml_str, mimetype="application/xml")
+
+def AllNewMovies_load_movies():
+    with open("files/MovieMeta.txt", "r", encoding="utf-8") as f:
+        content = f.read()
+
+    blocks = content.strip().split("\n\n")
+    movies = []
+
+    for block in blocks:
+        movie = {}
+        for line in block.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                movie[key.strip()] = value.strip()
+        if movie:
+            movies.append(movie)
+
+    return movies
+
+@app.route("/v770/url1/list/new/all.xml")
+@app.route("/v1025/url1/list/new/all.xml")
+def AllNewMovies():
+    movies = AllNewMovies_load_movies()  # reuse the function we already made
+
+    root = ET.Element("AllNewMovies")
+    ET.SubElement(root, "ver").text = "1"
+
+    for i, m in enumerate(movies, start=1):
+        movieinfo = ET.SubElement(root, "movieinfo")
+
+        ET.SubElement(movieinfo, "rank").text = str(i)
+        ET.SubElement(movieinfo, "movieid").text = m.get("MovieId", "0")
+        ET.SubElement(movieinfo, "title").text = m.get("Title", "")
+        ET.SubElement(movieinfo, "genre").text = m.get("genre", "0")
+        ET.SubElement(movieinfo, "strdt").text = "2000-01-01T00:00:00"
+        ET.SubElement(movieinfo, "pop").text = m.get("dsdist", "0")  # or "0" if you prefer
+
+    xml_str = ET.tostring(root, encoding="utf-8")
+
+    return Response(xml_str, mimetype="application/xml")
+
+@app.route("/v770/url1/list/popular/all.xml")
+@app.route("/v1025/url1/list/popular/all.xml")
+def AllPopularMovies():
+    movies = AllNewMovies_load_movies()  # reuse the function we already made
+
+    root = ET.Element("AllPopularMovies")
+    ET.SubElement(root, "ver").text = "1"
+
+    for i, m in enumerate(movies, start=1):
+        movieinfo = ET.SubElement(root, "movieinfo")
+
+        ET.SubElement(movieinfo, "rank").text = str(i)
+        ET.SubElement(movieinfo, "movieid").text = m.get("MovieId", "0")
+        ET.SubElement(movieinfo, "title").text = m.get("Title", "")
+        ET.SubElement(movieinfo, "genre").text = m.get("genre", "0")
+        ET.SubElement(movieinfo, "strdt").text = "2000-01-01T00:00:00"
+        ET.SubElement(movieinfo, "pop").text = m.get("dsdist", "0")  # or "0" if you prefer
+
+    xml_str = ET.tostring(root, encoding="utf-8")
+
+    return Response(xml_str, mimetype="application/xml")
+
+@app.route("/v770/url1/list/category/03.xml")
+@app.route("/v1025/url1/list/category/03.xml")
+def CompaniesCategoryList():
+    categories = CategoryList_load_categories()
+
+    xml = []
+    xml.append("<CategoryList>")
+    xml.append("  <ver>1</ver>")
+    xml.append("  <type>3</type>")
+
+    for idx, cat in enumerate(categories, start=1):
+        xml.append("  <categinfo>")
+        xml.append(f"    <place>{idx}</place>")
+        xml.append(f"    <categid>{cat.get('categid','')}</categid>")
+        xml.append(f"    <name>{cat.get('name','')}</name>")
+        xml.append(f"    <sppageid>1</sppageid>")
+        xml.append(f"    <splinktext>Link text</splinktext>")
+        xml.append("  </categinfo>")
+
+    xml.append("</CategoryList>")
+
+    return Response("\n".join(xml), mimetype="application/xml")
+
+def RelatedMovies_parse_movies(file_path):
+    movies = []
+    movie = {}
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+
+            if not line:
+                if movie:
+                    movies.append(movie)
+                    movie = {}
+                continue
+
+            if ":" in line:
+                key, value = line.split(":", 1)
+                movie[key.strip()] = value.strip()
+
+        if movie:
+            movies.append(movie)
+
+    return movies
+
+
+def RelatedMovies_pick_movies(movies, count, exclude_id=None):
+    pool = [m for m in movies if m.get("MovieId") != exclude_id]
+
+    # If not enough movies, loop until we reach count
+    result = []
+    while len(result) < count:
+        result.append(random.choice(pool))
+
+    return result
+
+
+@app.route("/v1025/url2/related.cgi")
+def RelatedMovies():
+    movieid = request.args.get("movieid")
+
+    movies = RelatedMovies_parse_movies("files/MovieMeta.txt")
+
+    left_movies = RelatedMovies_pick_movies(movies, 15, exclude_id=movieid)
+    right_movies = RelatedMovies_pick_movies(movies, 15, exclude_id=movieid)
+
+    xml = ["<RelatedMovies>", "<ver>1</ver>"]
+
+    for i, m in enumerate(left_movies, start=1):
+        xml.append(f"""
+<leftmovieinfo>
+    <rank>{i}</rank>
+    <movieid>{m.get("MovieId")}</movieid>
+    <title>{m.get("Title")}</title>
+</leftmovieinfo>""")
+
+    for i, m in enumerate(right_movies, start=1):
+        xml.append(f"""
+<rightmovieinfo>
+    <rank>{i}</rank>
+    <movieid>{m.get("MovieId")}</movieid>
+    <title>{m.get("Title")}</title>
+</rightmovieinfo>""")
+
+    xml.append("</RelatedMovies>")
+
+    return Response("\n".join(xml), mimetype="application/xml")
+
+
+# ----------------------------
+# Parse PayMovieMeta.txt
+# ----------------------------
+def PayMovieMeta_load_movies(path="files/PayMovieMeta.txt"):
+    movies = {}
+    current = {}
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+
+            # blank line = end of block
+            if not line:
+                if "MovieId" in current:
+                    movies[current["MovieId"]] = current
+                current = {}
+                continue
+
+            if ":" in line:
+                k, v = line.split(":", 1)
+                current[k.strip()] = v.strip()
+
+        # last block
+        if "MovieId" in current:
+            movies[current["MovieId"]] = current
+
+    return movies
+
+
+# Load once at startup (faster than reading every request)
+MOVIES = PayMovieMeta_load_movies()
+
+
+# ----------------------------
+# Route
+# /v770/url3/pay/movie/<anything>/<movieid>.met
+# ----------------------------
+@app.route("/v770/url3/pay/movie/<path:anything>/<moviefile>.met")
+def PayMovieMeta(anything, moviefile):
+    MOVIES = PayMovieMeta_load_movies()
+    movieid = moviefile.replace(".met", "")
+
+    movie = MOVIES.get(movieid)
+
+    if not movie:
+        return Response("<error>Movie not found</error>", mimetype="application/xml")
+
+    dsdist = movie.get("dsdist", "0")
+
+    dsmovid_tag = f"<dsmovid>{movie.get('MovieId','')}</dsmovid>" if dsdist != "0" else ""
+
+    xml = f"""<PayMovieMeta>
+        <ver>1</ver>
+        <movieid>{movie.get('MovieId','')}</movieid>
+        <title>{movie.get('Title','')}</title>
+        <kana>12345678</kana>
+        <len>{movie.get('Len','')}</len>
+        <aspect>{movie.get('aspect','')}</aspect>
+        <payenddt>2030-01-01T00:00:00</payenddt>
+        <dsdist>{dsdist}</dsdist>
+        {dsmovid_tag}
+        <staff>{movie.get('staff','0')}</staff>
+        <note>{movie.get('note','')}</note>
+        <dimg>{movie.get('dimg','0')}</dimg>
+        <eval>1</eval>
+        <refid>01234567890123456789012345678912</refid>
+        <pricecd>1111111</pricecd>
+        <term>1</term>
+        <price>{movie.get('Price','0')}</price>
+        <sample>{movie.get('Sample','0')}</sample>
+        <smpap>1</smpap>
+        <released>{movie.get('Released','')}</released>
+        <encrypt>0</encrypt>
+        <geofilter>0</geofilter>
+    </PayMovieMeta>"""
     
+    return Response(xml, mimetype="application/xml")
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=80)

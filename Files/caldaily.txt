@@ -10,6 +10,18 @@ movieid:2
 movieid:3
 movieid:4
 
+Date:2026-04-28
+Tindex:1
+Thead:Test
+Tdetails:This is a test for theads
+timg:0
+timgnum:0
+tbgm:1
+movieid:1
+movieid:2
+movieid:3
+movieid:4
+
 Default String:
 Tindex:1
 Thead:Welcome to Vii no ma
